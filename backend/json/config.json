@@ -1,0 +1,13 @@
+{
+  "http": {
+    "url": "0.0.0.0",
+    "port": 3000
+  },
+  "mssql": {
+    "server": "192.168.1.2",
+    "port": 1433,
+    "user": "sa",
+    "password": "",
+    "database": "DB_ZZZ1"
+  }
+}

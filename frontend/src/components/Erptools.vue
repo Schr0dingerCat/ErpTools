@@ -1,39 +1,39 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import axios from "axios";
-    // 定义常量对象，使用时需要用 xx.value
-    const options = ref([
-      {
-        value: "",
-        label: "",
-      },
-    ]);
-    const form = ref({
-        prdno: "",
-        date1: "",
-      });
-    // 加载 /erptools界面是自动获取数据
-    axios
-      .post("/erptools", {
-        cmd: "getprdno",
-      })
-      .then(function (response) {
-        options.value = response.data.options;
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
+// 定义常量对象，使用时需要用 xx.value
+const options = ref([
+  {
+    value: "",
+    label: "",
+  },
+]);
+const form = ref({
+  prdno: "",
+  date1: "",
+});
+// 加载 /erptools界面是自动获取数据
+axios
+  .post("/erptools", {
+    cmd: "getprdno",
+  })
+  .then(function (response) {
+    options.value = response.data.options;
+  })
+  .catch(function (error) {
+    console.log(error);
+  });
 
-    // TODO: 发送数据，后台查询
-    const onSubmit = () => {
-      console.log("submit!");
-      axios
-        .post("/erptools", {
-          cmd: "getsolist",
-        })
-        .then((response) => { })
-        .catch((error) => { });
-    };
+// TODO: 发送数据，后台查询
+const onSubmit = () => {
+  console.log("submit!");
+  axios
+    .post("/erptools", {
+      cmd: "getsolist",
+    })
+    .then((response) => { })
+    .catch((error) => { });
+};
 </script>
 
 <template>
@@ -60,4 +60,5 @@ import axios from "axios";
       <el-button type="primary" @click="onSubmit">查询</el-button>
     </el-form-item>
   </el-form>
+  <el-backtop></el-backtop>
 </template>

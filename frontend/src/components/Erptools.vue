@@ -9,14 +9,14 @@
       ></el-date-picker>
     </el-form-item>
     <el-form-item label="货品代号">
-      <el-select v-model="form.prdno" clearable filterable placeholder="请选择">
-        <el-option
-          v-for="item in options"
-          :key="item.value"
-          :label="item.label"
-          :value="item.value"
-        ></el-option>
-      </el-select>
+      <el-select-v2
+        v-model="form.prdno"
+        :options="options"
+        clearable
+        filterable
+        placeholder="请选择"
+        style="width: 240px; text-align: left"
+      ></el-select-v2>
     </el-form-item>
     <el-form-item>
       <el-button type="primary" @click="onSubmit">查询</el-button>
@@ -56,8 +56,8 @@ export default defineComponent({
         .post("/erptools", {
           cmd: "getsolist",
         })
-        .then((response) => {})
-        .catch((error) => {});
+        .then((response) => { })
+        .catch((error) => { });
     };
 
     return {

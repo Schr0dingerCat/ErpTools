@@ -31,8 +31,8 @@ const onSubmit = () => {
     .post("/erptools", {
       cmd: "getsolist",
     })
-    .then((response) => { })
-    .catch((error) => { });
+    .then((response) => {})
+    .catch((error) => {});
 };
 </script>
 

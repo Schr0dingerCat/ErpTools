@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,26 @@ type JsPrdno struct {
 	Label string `json:"label"`
 }
 
+type JsFormSo struct {
+	Prdno string `json:"prdno"`
+	Dateso []string `json:"dateso"`
+}
+
+type JsSoData struct {
+	Sono string `json:"sono"`
+	EstItmSo int `json:"estitmso"`
+	Prdno string `json:"prdno"`
+	Prdname string `json:"prdname"`
+	QtySo int `json:"qtyso"`
+	Cusname string `json:"cusname"`
+	Estdd string `json:"estdd"`
+	ClsMpId string `json:"clsmpid"`
+	Mono string `json:"mono"`
+	QtySoLj int `json:"qtysolj"`
+	BilType string `json:"biltype"`
+	Status string `json:"status"`
+}
+
 var (
 	Sqlconn *sql.DB
 	Config  JsConfig
@@ -43,6 +64,7 @@ var (
 )
 
 func main() {
+
 	err = LoadJsonFile("./json/config.json", &Config)
 	if err != nil {
 		fmt.Print("加载配置文件config.json错误：")
@@ -120,6 +142,15 @@ func PostErpTools(c *gin.Context) {
 			"message": "获取货品代号",
 			"error":   0,
 		})
+	case "getsolist":
+		// 处理函数
+		SoDatas := GetSoTableJsonFromDB(jsonMap["args"])
+		// 返回数据
+		c.JSON(http.StatusOK, gin.H{
+			"options": SoDatas,
+			"message": "获取受订数据",
+			"error":   0,
+		})
 	default:
 		c.JSON(http.StatusFound, gin.H{
 			"message": "Error 302",
@@ -142,6 +173,40 @@ func GetPrdnoFromDB() []JsPrdno {
 	}
 	// Options = []JsPrdno{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
 	return Options
+}
+
+func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
+	var sodatas []JsSoData
+	// 获取参数
+	formSO := JsFormSo{}
+	_ = json.Unmarshal([]byte(JsFormSoString), &formSO)
+	// utc时间转本地时间 
+	t1, _ := time.Parse(time.RFC3339, formSO.Dateso[0])
+	date0 := t1.In(time.Local).Format("2006-01-02")
+	t1, _ = time.Parse(time.RFC3339, formSO.Dateso[1])
+	date1 := t1.In(time.Local).Format("2006-01-02") + " 23:59:59"
+	// 获取数据
+	var rows *sql.Rows
+	if formSO.Prdno == "" {
+		s := `BEGIN WITH T0_1 AS ( SELECT MF_POS.OS_DD AS [SO_DD], MF_POS.OS_NO AS [SO_NO], TF_POS.EST_ITM AS [EST_ITM_SO], TF_POS.PRD_NO, TF_POS.PRD_NAME, TF_POS.QTY AS [QTY_SO], CUST.NAME AS [CUS_NAME], TF_POS.EST_DD, TF_POS.CLS_MP_ID, MF_POS.BIL_TYPE FROM MF_POS, TF_POS, CUST WHERE MF_POS.OS_NO = TF_POS.OS_NO AND MF_POS.OS_ID = 'SO' AND MF_POS.CLS_DATE IS NOT NULL AND MF_POS.CUS_NO = CUST.CUS_NO AND ( TF_POS.EST_DD BETWEEN ? AND ? )), T0_2 AS ( SELECT DISTINCT SO_NO FROM T0_1 ), T0_3 AS ( SELECT TF_BG1.BG_FLAG, TF_BG1.OS_NO, ROW_NUMBER () OVER ( PARTITION BY TF_BG1.OS_NO ORDER BY TF_BG1.BG_DD DESC ) AS [ID] FROM MF_BG, TF_BG1, T0_2 WHERE MF_BG.BG_NO = TF_BG1.BG_NO AND MF_BG.CLS_DATE IS NOT NULL AND TF_BG1.OS_NO = T0_2.SO_NO ), T0_4 AS ( SELECT TF_POS.OS_NO, TF_POS.EST_ITM FROM T0_3, TF_POS WHERE T0_3.BG_FLAG = '4' AND T0_3.ID = 1 AND T0_3.OS_NO = TF_POS.OS_NO ), T0_7 AS ( SELECT T0_1.SO_DD, T0_1.SO_NO, T0_1.EST_ITM_SO, T0_1.PRD_NO, T0_1.PRD_NAME, T0_1.QTY_SO, T0_1.CUS_NAME, T0_1.EST_DD, T0_1.CLS_MP_ID, T0_1.BIL_TYPE FROM T0_1 LEFT JOIN T0_4 ON ( T0_1.SO_NO = T0_4.OS_NO AND T0_1.EST_ITM_SO = T0_4.EST_ITM ) WHERE T0_4.OS_NO IS NULL ), T0_5 AS ( SELECT DISTINCT PRD_NO FROM T0_7 ), T0_6 AS ( SELECT PRD_NO AS [PRD_NO], PRD_NO AS [PRD_NO1] FROM T0_5 UNION ALL ( SELECT MF_BOM.PRD_NO, TF_BOM.PRD_NO AS [PRD_NO1] FROM MF_BOM, TF_BOM, T0_5, MF_ZC WHERE MF_BOM.BOM_NO = T0_5.PRD_NO + '->' AND MF_BOM.BOM_NO = TF_BOM.BOM_NO AND ( TF_BOM.ID_NO IS NOT NULL AND TF_BOM.ID_NO <> '' ) AND TF_BOM.ID_NO = MF_ZC.BOM_NO ) ), T1 AS ( SELECT T0_7.SO_DD, T0_7.SO_NO, T0_7.EST_ITM_SO, T0_6.PRD_NO1 AS [PRD_NO], T0_7.PRD_NAME, T0_7.QTY_SO, T0_7.CUS_NAME, T0_7.EST_DD, T0_7.CLS_MP_ID, T0_7.BIL_TYPE FROM T0_7, T0_6 WHERE T0_6.PRD_NO = T0_7.PRD_NO ), T2 AS ( SELECT DISTINCT TF_MP3.MP_NO FROM T1, TF_MP3 WHERE T1.SO_NO = TF_MP3.SO_NO ), T3 AS ( SELECT MF_MO.MO_NO, MF_MO.MO_DD, MF_MO.SO_NO, MF_MO.MRP_NO AS [PRD_NO], MF_MO.QTY AS [MO_QTY], MF_MO.BAT_NO, MF_MO.BIL_NO AS [MP_NO], MF_MO.ID_NO AS [BOM_NO] FROM MF_MO, T2 WHERE MF_MO.BIL_NO = T2.MP_NO ), T4 AS ( SELECT TF_MP3.SO_NO, TF_MP3.EST_ITM, TF_MP3.PRD_NO, ROW_NUMBER () OVER ( PARTITION BY T3.MO_NO, TF_MP3.PRD_NO ORDER BY TF_POS.EST_DD, TF_POS.OS_DD, TF_POS.ITM ) AS [ID], T3.MO_NO, TF_MP3.QTY_MO, TF_POS.QTY AS [QTY_SO] FROM TF_MP3, T3, TF_POS WHERE TF_MP3.MP_NO = T3.MP_NO AND TF_MP3.PRD_NO = T3.PRD_NO AND ( TF_MP3.MO_NO = T3.MO_NO OR TF_MP3.MO_NO IS NULL OR TF_MP3.MO_NO = '' ) AND TF_MP3.SO_NO = TF_POS.OS_NO AND TF_MP3.EST_ITM = TF_POS.EST_ITM ), T5 AS ( SELECT T5_1.SO_NO, T5_1.EST_ITM, T5_1.PRD_NO, T5_1.ID AS [ID_SO_MO], T5_1.MO_NO, SUM (T5_2.QTY_SO) AS [QTY_SO_LJ] FROM T4 AS T5_1, T4 AS T5_2 WHERE ( T5_1.PRD_NO = T5_2.PRD_NO AND T5_1.MO_NO = T5_2.MO_NO AND T5_2.ID <= T5_1.ID ) GROUP BY T5_1.SO_NO, T5_1.EST_ITM, T5_1.PRD_NO, T5_1.MO_NO, T5_1.ID ) SELECT T1.SO_NO, T1.EST_ITM_SO, T1.PRD_NO, T1.PRD_NAME, T1.QTY_SO, T1.CUS_NAME, T1.EST_DD, T1.CLS_MP_ID, T5.MO_NO, T5.QTY_SO_LJ, T1.BIL_TYPE, '未完成' AS [STATUS] FROM T1 LEFT JOIN T5 ON ( T1.SO_NO = T5.SO_NO AND T1.EST_ITM_SO = T5.EST_ITM AND T1.PRD_NO = T5.PRD_NO ) WHERE ( NOT ( T1.CLS_MP_ID = 'T' AND T5.MO_NO IS NULL ) ) OR ( T1.CLS_MP_ID IS NULL AND T5.MO_NO IS NULL ) ORDER BY T1.EST_DD, T5.MO_NO END`
+		rows, err = Sqlconn.Query(s, date0, date1)
+	} else {
+		s := `BEGIN WITH T0_1 AS ( SELECT MF_POS.OS_DD AS [SO_DD], MF_POS.OS_NO AS [SO_NO], TF_POS.EST_ITM AS [EST_ITM_SO], TF_POS.PRD_NO, TF_POS.PRD_NAME, TF_POS.QTY AS [QTY_SO], CUST.NAME AS [CUS_NAME], TF_POS.EST_DD, TF_POS.CLS_MP_ID, MF_POS.BIL_TYPE FROM MF_POS, TF_POS, CUST WHERE MF_POS.OS_NO = TF_POS.OS_NO AND MF_POS.OS_ID = 'SO' AND MF_POS.CLS_DATE IS NOT NULL AND MF_POS.CUS_NO = CUST.CUS_NO AND ( TF_POS.EST_DD BETWEEN ? AND ? ) AND TF_POS.PRD_NO = ? ), T0_2 AS ( SELECT DISTINCT SO_NO FROM T0_1 ), T0_3 AS ( SELECT TF_BG1.BG_FLAG, TF_BG1.OS_NO, ROW_NUMBER () OVER ( PARTITION BY TF_BG1.OS_NO ORDER BY TF_BG1.BG_DD DESC ) AS [ID] FROM MF_BG, TF_BG1, T0_2 WHERE MF_BG.BG_NO = TF_BG1.BG_NO AND MF_BG.CLS_DATE IS NOT NULL AND TF_BG1.OS_NO = T0_2.SO_NO ), T0_4 AS ( SELECT TF_POS.OS_NO, TF_POS.EST_ITM FROM T0_3, TF_POS WHERE T0_3.BG_FLAG = '4' AND T0_3.ID = 1 AND T0_3.OS_NO = TF_POS.OS_NO ), T0_7 AS ( SELECT T0_1.SO_DD, T0_1.SO_NO, T0_1.EST_ITM_SO, T0_1.PRD_NO, T0_1.PRD_NAME, T0_1.QTY_SO, T0_1.CUS_NAME, T0_1.EST_DD, T0_1.CLS_MP_ID, T0_1.BIL_TYPE FROM T0_1 LEFT JOIN T0_4 ON ( T0_1.SO_NO = T0_4.OS_NO AND T0_1.EST_ITM_SO = T0_4.EST_ITM ) WHERE T0_4.OS_NO IS NULL ), T0_5 AS ( SELECT DISTINCT PRD_NO FROM T0_7 ), T0_6 AS ( SELECT PRD_NO AS [PRD_NO], PRD_NO AS [PRD_NO1] FROM T0_5 UNION ALL ( SELECT MF_BOM.PRD_NO, TF_BOM.PRD_NO AS [PRD_NO1] FROM MF_BOM, TF_BOM, T0_5, MF_ZC WHERE MF_BOM.BOM_NO = T0_5.PRD_NO + '->' AND MF_BOM.BOM_NO = TF_BOM.BOM_NO AND ( TF_BOM.ID_NO IS NOT NULL AND TF_BOM.ID_NO <> '' ) AND TF_BOM.ID_NO = MF_ZC.BOM_NO ) ), T1 AS ( SELECT T0_7.SO_DD, T0_7.SO_NO, T0_7.EST_ITM_SO, T0_6.PRD_NO1 AS [PRD_NO], T0_7.PRD_NAME, T0_7.QTY_SO, T0_7.CUS_NAME, T0_7.EST_DD, T0_7.CLS_MP_ID, T0_7.BIL_TYPE FROM T0_7, T0_6 WHERE T0_6.PRD_NO = T0_7.PRD_NO ), T2 AS ( SELECT DISTINCT TF_MP3.MP_NO FROM T1, TF_MP3 WHERE T1.SO_NO = TF_MP3.SO_NO ), T3 AS ( SELECT MF_MO.MO_NO, MF_MO.MO_DD, MF_MO.SO_NO, MF_MO.MRP_NO AS [PRD_NO], MF_MO.QTY AS [MO_QTY], MF_MO.BAT_NO, MF_MO.BIL_NO AS [MP_NO], MF_MO.ID_NO AS [BOM_NO] FROM MF_MO, T2 WHERE MF_MO.BIL_NO = T2.MP_NO ), T4 AS ( SELECT TF_MP3.SO_NO, TF_MP3.EST_ITM, TF_MP3.PRD_NO, ROW_NUMBER () OVER ( PARTITION BY T3.MO_NO, TF_MP3.PRD_NO ORDER BY TF_POS.EST_DD, TF_POS.OS_DD, TF_POS.ITM ) AS [ID], T3.MO_NO, TF_MP3.QTY_MO, TF_POS.QTY AS [QTY_SO] FROM TF_MP3, T3, TF_POS WHERE TF_MP3.MP_NO = T3.MP_NO AND TF_MP3.PRD_NO = T3.PRD_NO AND ( TF_MP3.MO_NO = T3.MO_NO OR TF_MP3.MO_NO IS NULL OR TF_MP3.MO_NO = '' ) AND TF_MP3.SO_NO = TF_POS.OS_NO AND TF_MP3.EST_ITM = TF_POS.EST_ITM ), T5 AS ( SELECT T5_1.SO_NO, T5_1.EST_ITM, T5_1.PRD_NO, T5_1.ID AS [ID_SO_MO], T5_1.MO_NO, SUM (T5_2.QTY_SO) AS [QTY_SO_LJ] FROM T4 AS T5_1, T4 AS T5_2 WHERE ( T5_1.PRD_NO = T5_2.PRD_NO AND T5_1.MO_NO = T5_2.MO_NO AND T5_2.ID <= T5_1.ID ) GROUP BY T5_1.SO_NO, T5_1.EST_ITM, T5_1.PRD_NO, T5_1.MO_NO, T5_1.ID ) SELECT T1.SO_NO, T1.EST_ITM_SO, T1.PRD_NO, T1.PRD_NAME, T1.QTY_SO, T1.CUS_NAME, T1.EST_DD, T1.CLS_MP_ID, T5.MO_NO, T5.QTY_SO_LJ, T1.BIL_TYPE, '未完成' AS [STATUS] FROM T1 LEFT JOIN T5 ON ( T1.SO_NO = T5.SO_NO AND T1.EST_ITM_SO = T5.EST_ITM AND T1.PRD_NO = T5.PRD_NO ) WHERE ( NOT ( T1.CLS_MP_ID = 'T' AND T5.MO_NO IS NULL ) ) OR ( T1.CLS_MP_ID IS NULL AND T5.MO_NO IS NULL ) ORDER BY T1.EST_DD, T5.MO_NO END`
+		rows, err = Sqlconn.Query(s, date0, date1, formSO.Prdno)
+	}
+	if err != nil {
+		log.Fatal("GetSoTableJsonFromDB rows err: ", err.Error())
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sono, prdno, prdname, cusname, estdd, clsmpid, mono, biltype, status string
+		var estitmso, qtyso, qtysolj int
+		rows.Scan(&sono, &estitmso, &prdno, &prdname, &qtyso, &cusname, &estdd, &clsmpid, &mono, &qtysolj, &biltype, &status)
+		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd, clsmpid, mono, qtysolj, biltype, status})
+		i++
+	}
+	// sodatas = []JsSoData{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
+	return sodatas
 }
 
 func LoadFile(path string) ([]byte, error) {

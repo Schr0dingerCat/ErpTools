@@ -147,7 +147,7 @@ func PostErpTools(c *gin.Context) {
 		SoDatas := GetSoTableJsonFromDB(jsonMap["args"])
 		// 返回数据
 		c.JSON(http.StatusOK, gin.H{
-			"options": SoDatas,
+			"sodatas": SoDatas,
 			"message": "获取受订数据",
 			"error":   0,
 		})
@@ -203,7 +203,6 @@ func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
 		var estitmso, qtyso, qtysolj int
 		rows.Scan(&sono, &estitmso, &prdno, &prdname, &qtyso, &cusname, &estdd, &clsmpid, &mono, &qtysolj, &biltype, &status)
 		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd, clsmpid, mono, qtysolj, biltype, status})
-		i++
 	}
 	// sodatas = []JsSoData{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
 	return sodatas

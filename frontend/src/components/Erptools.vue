@@ -118,10 +118,10 @@ const onSoRowClick = (row: any, column: any, event: any) => {
       .then((response) => {
         tableData2.length = 0;
         tableData2.push(...response.data.tzdatas);
+        prdnocp.value = row["prdno"];
+        tableData3.push(response.data.bcpdatas);
         // 切换tab
         activeTab.value = "tab2";
-        prdnocp.value = row["prdno"];
-        qtycp.value = response.data.bcpdatas;
       })
       .catch((error) => {
         console.log(error);

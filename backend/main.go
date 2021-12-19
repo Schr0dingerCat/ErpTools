@@ -3,14 +3,14 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"erptools/opencc"
 	"fmt"
+	_ "github.com/denisenkom/go-mssqldb"
+	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
-	"erptools/opencc"
-	_ "github.com/denisenkom/go-mssqldb"
-	"github.com/gin-gonic/gin"
 )
 
 type JsHttp struct {
@@ -37,42 +37,49 @@ type JsPrdno struct {
 }
 
 type JsFormSo struct {
-	Prdno string `json:"prdno"`
+	Prdno  string   `json:"prdno"`
 	Dateso []string `json:"dateso"`
 }
 
 type JsSoData struct {
-	Sono string `json:"sono"`
-	EstItmSo int `json:"estitmso"`
-	Prdno string `json:"prdno"`
-	Prdname string `json:"prdname"`
-	QtySo float32 `json:"qtyso"`
-	Cusname string `json:"cusname"`
-	Estdd string `json:"estdd"`
-	ClsMpId string `json:"clsmpid"`
-	Mono string `json:"mono"`
-	QtySoLj float32 `json:"qtysolj"`
-	BilType string `json:"biltype"`
-	Status string `json:"status"`
+	Sono     string  `json:"sono"`
+	EstItmSo int     `json:"estitmso"`
+	Prdno    string  `json:"prdno"`
+	Prdname  string  `json:"prdname"`
+	QtySo    float32 `json:"qtyso"`
+	Cusname  string  `json:"cusname"`
+	Estdd    string  `json:"estdd"`
+	ClsMpId  string  `json:"clsmpid"`
+	Mono     string  `json:"mono"`
+	QtySoLj  float32 `json:"qtysolj"`
+	BilType  string  `json:"biltype"`
+	Status   string  `json:"status"`
 }
 
 type JsTzData struct {
-	Tzno string `json:"tzno"`
-	Depname string `json:"depname"`
-	Zcname string `json:"zcname"`
-	Qty float32 `json:"qty"`
-	Qtyfin float32 `json:"qtyfin"`
+	Tzno    string  `json:"tzno"`
+	Depname string  `json:"depname"`
+	Zcname  string  `json:"zcname"`
+	Qty     float32 `json:"qty"`
+	Qtyfin  float32 `json:"qtyfin"`
 	Qtylost float32 `json:"qtylost"`
-	Qtybf float32 `json:"qtybf"`
-	Qtysy float32 `json:"qtysy"`
-	Qtypgs float32 `json:"qtypgs"`
+	Qtybf   float32 `json:"qtybf"`
+	Qtysy   float32 `json:"qtysy"`
+	Qtypgs  float32 `json:"qtypgs"`
 	Mydinge float32 `json:"mydinge"`
 }
 
 type JsBcpSData struct {
-	Prdno string `json:"prdno"`
-	Zcname string `json:"zcname"`
-	Qty float32 `json:"qty"`
+	Prdno  string  `json:"prdno"`
+	Zcname string  `json:"zcname"`
+	Qty    float32 `json:"qty"`
+}
+
+type JsBcpData struct {
+	Prdno  string  `json:"prdno"`
+	Zcname string  `json:"zcname"`
+	Batno  string  `json:"batno"`
+	Qty    float32 `json:"qty"`
 }
 
 var (
@@ -80,7 +87,7 @@ var (
 	Sqlconn *sql.DB
 	Config  JsConfig
 	Options []JsPrdno
-	err error
+	err     error
 )
 
 func main() {
@@ -175,11 +182,19 @@ func PostErpTools(c *gin.Context) {
 		// 获取通知明细
 		TzDatas, BcpsDatas, Qtycp := GetTzTableFromDB(jsonMap["mono"], jsonMap["prdno"])
 		c.JSON(http.StatusOK, gin.H{
-			"tzdatas": TzDatas,
-			"qtycp": Qtycp,
+			"tzdatas":   TzDatas,
+			"qtycp":     Qtycp,
 			"bcpsdatas": BcpsDatas,
-			"message": "获取通知单数据",
-			"error":   0,
+			"message":   "获取通知单数据",
+			"error":     0,
+		})
+	case "getbcplist":
+		// 获取半成品明细
+		BcpDatas := GetBcpTableFromDB(jsonMap["prdno"])
+		c.JSON(http.StatusOK, gin.H{
+			"bcpdatas": BcpDatas,
+			"message":  "获取半成品明细数据",
+			"error":    0,
 		})
 	default:
 		c.JSON(http.StatusFound, gin.H{
@@ -210,7 +225,7 @@ func GetSoTableFromDB(JsFormSoString string) []JsSoData {
 	// 获取参数
 	formSO := JsFormSo{}
 	_ = json.Unmarshal([]byte(JsFormSoString), &formSO)
-	// utc时间转本地时间 
+	// utc时间转本地时间
 	t1, _ := time.Parse(time.RFC3339, formSO.Dateso[0])
 	date0 := t1.In(time.Local).Format("2006-01-02")
 	t1, _ = time.Parse(time.RFC3339, formSO.Dateso[1])
@@ -247,7 +262,7 @@ func GetSoTableFromDB(JsFormSoString string) []JsSoData {
 		}
 		// 取mono
 		if mono != "" {
-			monomap["TF_WR.MO_NO = '" + mono + "'"]+=1
+			monomap["TF_WR.MO_NO = '"+mono+"'"] += 1
 		}
 		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd[:10], clsmpid, mono, qtysolj, biltype, status})
 	}
@@ -255,10 +270,10 @@ func GetSoTableFromDB(JsFormSoString string) []JsSoData {
 		// 查询所有指令单包装上帐数量
 		monolist := "("
 		for k, _ := range monomap {
-			monolist += k+" OR "
+			monolist += k + " OR "
 		}
 		l := len(monolist) - 4
-		s1 := fmt.Sprintf("SELECT TF_WR.MO_NO, SUM(TF_WR.QTY_FIN) AS [QTY_BZ] FROM TF_WR, TF_ZC WHERE TF_WR.ID_NO = TF_ZC.BOM_NO AND TF_WR.ZC_NO = TF_ZC.ZC_NO AND (TF_ZC.ZC_NO_DN IS NULL OR TF_ZC.ZC_NO_DN = '') AND %s GROUP BY TF_WR.MO_NO", monolist[:l]+ ")")
+		s1 := fmt.Sprintf("SELECT TF_WR.MO_NO, SUM(TF_WR.QTY_FIN) AS [QTY_BZ] FROM TF_WR, TF_ZC WHERE TF_WR.ID_NO = TF_ZC.BOM_NO AND TF_WR.ZC_NO = TF_ZC.ZC_NO AND (TF_ZC.ZC_NO_DN IS NULL OR TF_ZC.ZC_NO_DN = '') AND %s GROUP BY TF_WR.MO_NO", monolist[:l]+")")
 		rows1, err := Sqlconn.Query(s1)
 		if err != nil {
 			log.Fatal("GetSoTableJsonFromDB in get bz rows err: ", err.Error())
@@ -317,7 +332,7 @@ func GetTzTableFromDB(mono, prdno string) ([]JsTzData, []JsBcpSData, float32) {
 		var qty float32
 		rows1.Scan(&prdno, &zcname, &qty)
 		// 繁简转换
-		zcname, _ = tw2s.Convert(zcname)	
+		zcname, _ = tw2s.Convert(zcname)
 		bcpsdatas = append(bcpsdatas, JsBcpSData{prdno, zcname, qty})
 	}
 	// 获取成品库库存总数
@@ -327,6 +342,26 @@ func GetTzTableFromDB(mono, prdno string) ([]JsTzData, []JsBcpSData, float32) {
 		log.Fatal("GetTzTableFromDB cp rows err: ", err.Error())
 	}
 	return tzdatas, bcpsdatas, qtycp
+}
+
+func GetBcpTableFromDB(prdno string) []JsBcpData {
+	var bcpdatas []JsBcpData
+	s := `SELECT BAT_REC1.PRD_NO, PRDT.SPC, BAT_REC1.BAT_NO, SUM(ISNULL(BAT_REC1.QTY_IN, 0) - ISNULL(BAT_REC1.QTY_OUT, 0)) AS [QTY] FROM BAT_REC1, PRDT WHERE BAT_REC1.PRD_NO LIKE ? AND BAT_REC1.PRD_NO = PRDT.PRD_NO AND (BAT_REC1.WH LIKE '11%' OR BAT_REC1.WH LIKE '12%' OR BAT_REC1.WH LIKE '13%') AND (BAT_REC1.WH <> '11  999999' AND BAT_REC1.WH <> '12  999999' AND BAT_REC1.WH <> '13  999999') AND (ISNULL(BAT_REC1.QTY_IN, 0) - ISNULL(BAT_REC1.QTY_OUT, 0) > 0) GROUP BY BAT_REC1.PRD_NO, BAT_REC1.BAT_NO, PRDT.SPC ORDER BY BAT_REC1.PRD_NO`
+	rows, err := Sqlconn.Query(s, prdno+"%")
+	if err != nil {
+		log.Fatal("GetBcpTableFromDB rows err: ", err.Error())
+	}
+	defer rows.Close()
+	// 处理数据
+	for rows.Next() {
+		var prdno, zcname, batno string
+		var qty float32
+		rows.Scan(&prdno, &zcname, &batno, &qty)
+		// 繁简转换
+		zcname, _ = tw2s.Convert(zcname)
+		bcpdatas = append(bcpdatas, JsBcpData{prdno, zcname, batno, qty})
+	}
+	return bcpdatas
 }
 
 func LoadFile(path string) ([]byte, error) {

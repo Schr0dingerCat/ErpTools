@@ -94,6 +94,11 @@ const onSubmit = () => {
       tableData1.length = 0;
       tableData1.push(...response.data.sodatas);
       // console.log(tableData1);
+      tableData2.length = 0;
+      tableData3.length = 0;
+      tableData4.length = 0;
+      prdnocp.value = "";
+      qtycp.value = "";
     })
     .catch((error) => {
       console.log(error);
@@ -114,12 +119,14 @@ const onSoRowClick = (row: any, column: any, event: any) => {
       .post("/erptools", {
         cmd: "gettzlist",
         mono: row["mono"],
+        prdno: row["prdno"],
       })
       .then((response) => {
         tableData2.length = 0;
         tableData2.push(...response.data.tzdatas);
         prdnocp.value = row["prdno"];
-        tableData3.push(response.data.bcpdatas);
+        qtycp.value = response.data.qtycp;
+        tableData3.push(...response.data.bcpsdatas);
         // 切换tab
         activeTab.value = "tab2";
       })

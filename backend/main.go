@@ -56,6 +56,25 @@ type JsSoData struct {
 	Status string `json:"status"`
 }
 
+type JsTzData struct {
+	Tzno string `json:"tzno"`
+	Depname string `json:"depname"`
+	Zcname string `json:"zcname"`
+	Qty float32 `json:"qty"`
+	Qtyfin float32 `json:"qtyfin"`
+	Qtylost float32 `json:"qtylost"`
+	Qtybf float32 `json:"qtybf"`
+	Qtysy float32 `json:"qtysy"`
+	Qtypgs float32 `json:"qtypgs"`
+	Mydinge float32 `json:"mydinge"`
+}
+
+type JsBcpSData struct {
+	Prdno string `json:"prdno"`
+	Zcname string `json:"zcname"`
+	Qty float32 `json:"qty"`
+}
+
 var (
 	tw2s, _ = opencc.New("tw2s")
 	Sqlconn *sql.DB
@@ -145,11 +164,21 @@ func PostErpTools(c *gin.Context) {
 		})
 	case "getsolist":
 		// 处理函数
-		SoDatas := GetSoTableJsonFromDB(jsonMap["args"])
+		SoDatas := GetSoTableFromDB(jsonMap["args"])
 		// 返回数据
 		c.JSON(http.StatusOK, gin.H{
 			"sodatas": SoDatas,
 			"message": "获取受订数据",
+			"error":   0,
+		})
+	case "gettzlist":
+		// 获取通知明细
+		TzDatas, BcpsDatas, Qtycp := GetTzTableFromDB(jsonMap["mono"], jsonMap["prdno"])
+		c.JSON(http.StatusOK, gin.H{
+			"tzdatas": TzDatas,
+			"qtycp": Qtycp,
+			"bcpsdatas": BcpsDatas,
+			"message": "获取通知单数据",
 			"error":   0,
 		})
 	default:
@@ -176,7 +205,7 @@ func GetPrdnoFromDB() []JsPrdno {
 	return Options
 }
 
-func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
+func GetSoTableFromDB(JsFormSoString string) []JsSoData {
 	var sodatas []JsSoData
 	// 获取参数
 	formSO := JsFormSo{}
@@ -253,6 +282,51 @@ func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
 	// sodatas = []JsSoData{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
 	// log.Println(sodatas)
 	return sodatas
+}
+
+func GetTzTableFromDB(mono, prdno string) ([]JsTzData, []JsBcpSData, float32) {
+	var tzdatas []JsTzData
+	var bcpsdatas []JsBcpSData
+	var qtycp float32
+	// 获取通知单明细
+	s := `BEGIN WITH T0 AS ( SELECT MF_TZ.TZ_NO, MF_TZ.ZC_ITM, DEPT.NAME AS [DEP_NAME], ZC_NO.NAME AS [ZC_NAME], ISNULL(MF_TZ.QTY, 0) AS [QTY], ISNULL(MF_TZ.QTY_FIN, 0) AS [QTY_FIN], ISNULL(MF_TZ.QTY_LOST, 0) AS [QTY_LOST], MF_TZ.MRP_NO AS [PRD_NO], MF_TZ.ZC_NO FROM MF_TZ, ZC_NO, DEPT WHERE MF_TZ.MO_NO = ? AND ( MF_TZ.BIL_ID <> 'TR' OR MF_TZ.BIL_ID IS NULL ) AND MF_TZ.ZC_NO = ZC_NO.ZC_NO AND MF_TZ.DEP = DEPT.DEP ), T1 AS ( SELECT T0.TZ_NO, T0.ZC_ITM, T0.DEP_NAME, T0.ZC_NAME, T0.QTY, T0.QTY_FIN, T0.QTY_LOST, TT1.MY_DINGE FROM T0 LEFT JOIN (SELECT UP_DEF.PRD_NO, UP_DEF.BZ_KND AS [ZC_NO], ISNULL(UP_DEF_Z.MY_DINGE, 0) AS [MY_DINGE], ROW_NUMBER () OVER ( PARTITION BY UP_DEF_Z.PRICE_ID, UP_DEF_Z.CUS_NO, UP_DEF_Z.CUR_ID, UP_DEF_Z.PRD_NO, UP_DEF_Z.BZ_KND, UP_DEF_Z.QTY, UP_DEF_Z.BIL_TYPE ORDER BY UP_DEF_Z.S_DD DESC ) AS ID FROM UP_DEF, UP_DEF_Z WHERE UP_DEF.CHK_MAN IS NOT NULL AND UP_DEF.PRICE_ID = '3' AND UP_DEF.CUS_NO = '0000' AND (UP_DEF.BIL_TYPE = '01') AND UP_DEF.QTY = 1 AND UP_DEF.PRICE_ID = UP_DEF_Z.PRICE_ID AND UP_DEF.CUR_ID = UP_DEF_Z.CUR_ID AND UP_DEF.CUS_NO = UP_DEF_Z.CUS_NO AND UP_DEF.PRD_NO = UP_DEF_Z.PRD_NO AND UP_DEF.BZ_KND = UP_DEF_Z.BZ_KND AND UP_DEF.QTY = UP_DEF_Z.QTY AND UP_DEF.S_DD = UP_DEF_Z.S_DD AND UP_DEF.BIL_TYPE = UP_DEF_Z.BIL_TYPE AND UP_DEF.PRD_NO = ? ) AS TT1 ON ( TT1.ID = 1 AND T0.PRD_NO = TT1.PRD_NO AND T0.ZC_NO = TT1.ZC_NO) ), T2 AS ( SELECT TF_SCPG.BIL_NO, ISNULL(SUM(TF_SCPG.QTY), 0) AS [QTY_PGS] FROM TF_SCPG, T1 WHERE TF_SCPG.BIL_NO = T1.TZ_NO GROUP BY TF_SCPG.BIL_NO ), T3 AS ( SELECT TZERR.TZ_NO, ISNULL(SUM(TF_IJ.QTY), 0) AS [QTY_BF] FROM MF_IJ, TF_IJ, TZERR, T1 WHERE TZERR.TZ_NO = T1.TZ_NO AND MF_IJ.BIL_NO = TZERR.TR_NO AND MF_IJ.IJ_ID = 'XF' AND TF_IJ.IJ_ID = 'XF' AND MF_IJ.IJ_NO = TF_IJ.IJ_NO GROUP BY TZERR.TZ_NO ) SELECT T1.TZ_NO, T1.DEP_NAME, T1.ZC_NAME, T1.QTY, T1.QTY_FIN, T1.QTY_LOST, ISNULL(T3.QTY_BF, 0) AS [QTY_BF], ( T1.QTY - ISNULL(T1.QTY_FIN, 0) - ISNULL(T3.QTY_BF, 0) ) AS [QTY_SY], ISNULL(T2.QTY_PGS, 0) AS [QTY_PGS], T1.MY_DINGE FROM T1 FULL JOIN T2 ON T1.TZ_NO = T2.BIL_NO FULL JOIN T3 ON T1.TZ_NO = T3.TZ_NO ORDER BY T1.ZC_ITM END`
+	rows, err := Sqlconn.Query(s, mono, prdno)
+	if err != nil {
+		log.Fatal("GetTzTableFromDB tz rows err: ", err.Error())
+	}
+	defer rows.Close()
+	// 处理数据
+	for rows.Next() {
+		var tzno, depname, zcname string
+		var qty, qtyfin, qtylost, qtybf, qtysy, qtypgs, mydinge float32
+		rows.Scan(&tzno, &depname, &zcname, &qty, &qtyfin, &qtylost, &qtybf, &qtysy, &qtypgs, &mydinge)
+		// 繁简转换
+		depname, _ = tw2s.Convert(depname)
+		zcname, _ = tw2s.Convert(zcname)
+		tzdatas = append(tzdatas, JsTzData{tzno, depname, zcname, qty, qtyfin, qtylost, qtybf, qtysy, qtypgs, mydinge})
+	}
+	// 获取半成品各序库存总数
+	s1 := `SELECT BAT_REC1.PRD_NO, PRDT.SPC, SUM(ISNULL(BAT_REC1.QTY_IN, 0) - ISNULL(BAT_REC1.QTY_OUT, 0)) AS [QTY] FROM BAT_REC1, PRDT WHERE BAT_REC1.PRD_NO LIKE ? + '%' AND BAT_REC1.PRD_NO = PRDT.PRD_NO AND (BAT_REC1.WH LIKE '11%' OR BAT_REC1.WH LIKE '12%' OR BAT_REC1.WH LIKE '13%') AND (BAT_REC1.WH <> '11  999999' AND BAT_REC1.WH <> '12  999999' AND BAT_REC1.WH <> '13  999999') AND (ISNULL(BAT_REC1.QTY_IN, 0) - ISNULL(BAT_REC1.QTY_OUT, 0) > 0) GROUP BY BAT_REC1.PRD_NO, PRDT.SPC`
+	rows1, err := Sqlconn.Query(s1, prdno)
+	if err != nil {
+		log.Fatal("GetTzTableFromDB bcp rows err: ", err.Error())
+	}
+	defer rows1.Close()
+	for rows1.Next() {
+		var prdno, zcname string
+		var qty float32
+		rows1.Scan(&prdno, &zcname, &qty)
+		// 繁简转换
+		zcname, _ = tw2s.Convert(zcname)	
+		bcpsdatas = append(bcpsdatas, JsBcpSData{prdno, zcname, qty})
+	}
+	// 获取成品库库存总数
+	s2 := `SELECT ISNULL(SUM(ISNULL(QTY_IN, 0) - ISNULL(QTY_OUT, 0)), 0) AS [QTY] FROM DB_CH.dbo.BAT_REC1 WHERE PRD_NO = ? AND (WH = '02' OR WH LIKE '02  %') AND (WH <> '02  000000') AND ISNULL(QTY_IN, 0) - ISNULL(QTY_OUT, 0) > 0`
+	err = Sqlconn.QueryRow(s2, prdno).Scan(&qtycp)
+	if err != nil {
+		log.Fatal("GetTzTableFromDB cp rows err: ", err.Error())
+	}
+	return tzdatas, bcpsdatas, qtycp
 }
 
 func LoadFile(path string) ([]byte, error) {

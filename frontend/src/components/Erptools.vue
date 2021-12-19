@@ -150,7 +150,9 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
     })
     .then((response) => {
       tableData4.length = 0;
-      tableData4.push(...response.data.bcpqwdatas);
+      tableData4.push(...response.data.bcpdatas);
+      // 切换tab
+      activeTab.value = "tab4";
     })
     .catch((error) => {
       console.log(error);

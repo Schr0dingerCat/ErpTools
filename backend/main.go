@@ -199,6 +199,8 @@ func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
 		log.Fatal("GetSoTableJsonFromDB rows err: ", err.Error())
 	}
 	defer rows.Close()
+	// 取得所有mono
+	var monomap = make(map[string]int)
 	for rows.Next() {
 		var sono, prdno, prdname, cusname, estdd, clsmpid, mono, biltype, status string
 		var estitmso int
@@ -207,7 +209,46 @@ func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
 		// 繁简转换
 		cusname, _ = tw2s.Convert(cusname)
 		prdname, _ = tw2s.Convert(prdname)
+		// 设置订单类型
+		switch biltype {
+		case "01":
+			biltype = "正常订单"
+		case "02":
+			biltype = "样品订单"
+		}
+		// 取mono
+		if mono != "" {
+			monomap["TF_WR.MO_NO = '" + mono + "'"]+=1
+		}
 		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd[:10], clsmpid, mono, qtysolj, biltype, status})
+	}
+	if len(monomap) > 0 {
+		// 查询所有指令单包装上帐数量
+		monolist := "("
+		for k, _ := range monomap {
+			monolist += k+" OR "
+		}
+		l := len(monolist) - 4
+		s1 := fmt.Sprintf("SELECT TF_WR.MO_NO, SUM(TF_WR.QTY_FIN) AS [QTY_BZ] FROM TF_WR, TF_ZC WHERE TF_WR.ID_NO = TF_ZC.BOM_NO AND TF_WR.ZC_NO = TF_ZC.ZC_NO AND (TF_ZC.ZC_NO_DN IS NULL OR TF_ZC.ZC_NO_DN = '') AND %s GROUP BY TF_WR.MO_NO", monolist[:l]+ ")")
+		rows1, err := Sqlconn.Query(s1)
+		if err != nil {
+			log.Fatal("GetSoTableJsonFromDB in get bz rows err: ", err.Error())
+		}
+		defer rows1.Close()
+		for rows1.Next() {
+			var mo string
+			var bz float32
+			rows1.Scan(&mo, &bz)
+			for i, v := range sodatas {
+				if v.Mono == mo && v.Mono != "" {
+					if bz < v.QtySoLj {
+						sodatas[i].Status = "未完成"
+					} else {
+						sodatas[i].Status = "已完成"
+					}
+				}
+			}
+		}
 	}
 	// sodatas = []JsSoData{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
 	// log.Println(sodatas)

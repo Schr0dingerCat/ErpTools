@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"time"
-
+	"erptools/opencc"
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/gin-gonic/gin"
 )
@@ -46,17 +46,18 @@ type JsSoData struct {
 	EstItmSo int `json:"estitmso"`
 	Prdno string `json:"prdno"`
 	Prdname string `json:"prdname"`
-	QtySo int `json:"qtyso"`
+	QtySo float32 `json:"qtyso"`
 	Cusname string `json:"cusname"`
 	Estdd string `json:"estdd"`
 	ClsMpId string `json:"clsmpid"`
 	Mono string `json:"mono"`
-	QtySoLj int `json:"qtysolj"`
+	QtySoLj float32 `json:"qtysolj"`
 	BilType string `json:"biltype"`
 	Status string `json:"status"`
 }
 
 var (
+	tw2s, _ = opencc.New("tw2s")
 	Sqlconn *sql.DB
 	Config  JsConfig
 	Options []JsPrdno
@@ -65,7 +66,7 @@ var (
 
 func main() {
 
-	err = LoadJsonFile("./json/config.json", &Config)
+	err = LoadJsonFile("./config/config.json", &Config)
 	if err != nil {
 		fmt.Print("加载配置文件config.json错误：")
 		fmt.Println(err)
@@ -200,11 +201,16 @@ func GetSoTableJsonFromDB(JsFormSoString string) []JsSoData {
 	defer rows.Close()
 	for rows.Next() {
 		var sono, prdno, prdname, cusname, estdd, clsmpid, mono, biltype, status string
-		var estitmso, qtyso, qtysolj int
+		var estitmso int
+		var qtyso, qtysolj float32
 		rows.Scan(&sono, &estitmso, &prdno, &prdname, &qtyso, &cusname, &estdd, &clsmpid, &mono, &qtysolj, &biltype, &status)
-		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd, clsmpid, mono, qtysolj, biltype, status})
+		// 繁简转换
+		cusname, _ = tw2s.Convert(cusname)
+		prdname, _ = tw2s.Convert(prdname)
+		sodatas = append(sodatas, JsSoData{sono, estitmso, prdno, prdname, qtyso, cusname, estdd[:10], clsmpid, mono, qtysolj, biltype, status})
 	}
 	// sodatas = []JsSoData{{"Q-001"}, {"Q-002"}, {"Q-003"}, {"Q-004"}, {"Q-005"}, {"Q-006"}, {"Q-007"}, {"Q-008"}, {"Q-009"}, {"Q-010"}, {"Q-011"}, {"Q-012"}, {"Q-013"}, {"Q-014"}, {"Q-015"}, {"Q-016"}, {"Q-017"}, {"Q-018"}}
+	// log.Println(sodatas)
 	return sodatas
 }
 

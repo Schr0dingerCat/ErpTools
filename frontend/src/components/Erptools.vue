@@ -93,7 +93,6 @@ const onSubmit = () => {
     .then((response) => {
       tableData1.length = 0;
       tableData1.push(...response.data.sodatas);
-      // console.log(tableData1);
       tableData2.length = 0;
       tableData3.length = 0;
       tableData4.length = 0;
@@ -126,7 +125,10 @@ const onSoRowClick = (row: any, column: any, event: any) => {
         tableData2.push(...response.data.tzdatas);
         prdnocp.value = row["prdno"];
         qtycp.value = response.data.qtycp;
-        tableData3.push(...response.data.bcpsdatas);
+        tableData3.length = 0;
+        if (response.data.bcpsdatas != null) {
+          tableData3.push(...response.data.bcpsdatas);
+        }
         // 切换tab
         activeTab.value = "tab2";
       })
@@ -201,31 +203,32 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
           stripe
           height="700"
           style="width: 100%"
+          highlight-current-row
           @row-click="onSoRowClick"
         >
-          <el-table-column prop="sono" label="受订单号" width="180" />
-          <el-table-column prop="prdno" label="货品代号" width="180" />
-          <el-table-column prop="qtyso" label="受订数量" width="180" />
-          <el-table-column prop="estdd" label="预交日期" width="180" />
-          <el-table-column prop="mono" label="制令单号" width="180" />
-          <el-table-column prop="status" label="是否完成" width="180" />
-          <el-table-column prop="cusname" label="客户名称" width="180" />
-          <el-table-column prop="prdname" label="货品名称" width="180" />
-          <el-table-column prop="biltype" label="订单类型" width="180" />
+          <el-table-column prop="sono" label="受订单号" width="80" />
+          <el-table-column prop="prdno" label="货品代号" width="80" />
+          <el-table-column prop="qtyso" label="受订数量" width="80" />
+          <el-table-column prop="estdd" label="预交日期" width="80" />
+          <el-table-column prop="mono" label="制令单号" width="80" />
+          <el-table-column prop="status" label="是否完成" width="80" />
+          <el-table-column prop="cusname" label="客户名称" width="150" />
+          <el-table-column prop="prdname" label="货品名称" width="80" />
+          <el-table-column prop="biltype" label="订单类型" width="80" />
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="制令单" name="tab2">
         <el-table :data="tableData2" stripe height="800" style="width: 100%">
-          <el-table-column prop="tzno" label="通知单号" width="180" />
-          <el-table-column prop="depname" label="部门名称" width="180" />
-          <el-table-column prop="zcname" label="制程名称" width="180" />
-          <el-table-column prop="qty" label="数量" width="180" />
-          <el-table-column prop="qtyfin" label="已完数量" width="180" />
-          <el-table-column prop="qtylost" label="不合格数" width="180" />
-          <el-table-column prop="qtybf" label="报废数量" width="180" />
-          <el-table-column prop="qtysy" label="剩余数量" width="180" />
-          <el-table-column prop="qtypgs" label="已派工量" width="180" />
-          <el-table-column prop="mydinge" label="当前定额" width="180" />
+          <el-table-column prop="zcname" label="制程名称" width="80" />
+          <el-table-column prop="qty" label="数量" width="80" />
+          <el-table-column prop="qtyfin" label="已完数量" width="80" />
+          <el-table-column prop="qtylost" label="不合格数" width="80" />
+          <el-table-column prop="qtybf" label="报废数量" width="80" />
+          <el-table-column prop="qtysy" label="剩余数量" width="80" />
+          <el-table-column prop="qtypgs" label="已派工量" width="80" />
+          <el-table-column prop="mydinge" label="当前定额" width="80" />
+          <el-table-column prop="tzno" label="通知单号" width="80" />
+          <el-table-column prop="depname" label="部门名称" width="80" />
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="库存" name="tab3">
@@ -236,20 +239,21 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
             stripe
             height="700"
             style="width: 100%"
+            highlight-current-row
             @row-click="onBcpRowClick"
           >
-            <el-table-column prop="prdno" label="货品代号" width="180" />
-            <el-table-column prop="zcname" label="制程名称" width="180" />
-            <el-table-column prop="qty" label="数量" width="180" />
+            <el-table-column prop="prdno" label="货品代号" width="80" />
+            <el-table-column prop="zcname" label="制程名称" width="80" />
+            <el-table-column prop="qty" label="数量" width="80" />
           </el-table>
         </div>
       </el-tab-pane>
       <el-tab-pane label="半成品区位" name="tab4">
         <el-table :data="tableData4" stripe height="700" style="width: 100%">
-          <el-table-column prop="prdno" label="货品代号" width="180" />
-          <el-table-column prop="zcname" label="制程名称" width="180" />
-          <el-table-column prop="batno" label="批次号" width="180" />
-          <el-table-column prop="qty" label="数量" width="180" />
+          <el-table-column prop="prdno" label="货品代号" width="80" />
+          <el-table-column prop="zcname" label="制程名称" width="80" />
+          <el-table-column prop="batno" label="批次号" width="80" />
+          <el-table-column prop="qty" label="数量" width="80" />
         </el-table>
       </el-tab-pane>
     </el-tabs>

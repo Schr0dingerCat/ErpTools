@@ -4,7 +4,7 @@ import axios from "axios";
 // 定义常量对象，使用时需要用 xx.value
 // 全屏loading
 const fullscreenLoading = ref(true);
-// tab测试
+// tab初始化
 const activeTab = ref("tab1");
 const prdnocp = ref();
 const qtycp = ref();
@@ -17,8 +17,12 @@ const options = ref([
 ]);
 const form = reactive({
   prdno: "",
-  dateso: "",
+  dateso: [""],
 });
+// el-date-picker 为了适配手机端，不使用daterange区间模式
+const dateso1 = ref("");
+const dateso2 = ref("");
+
 const tableData1 = reactive([
   {
     sono: "",
@@ -64,7 +68,12 @@ const tableData4 = reactive([
     qty: "",
   },
 ]);
-
+// 初始化
+tableData1.length = 0;
+tableData2.length = 0;
+tableData3.length = 0;
+tableData4.length = 0;
+// 界面加载后调用
 onMounted(() => {
   // 加载 /erptools界面是自动获取数据
   axios
@@ -84,6 +93,7 @@ onMounted(() => {
 
 // TODO: 发送数据，后台查询
 const onSubmit = () => {
+  form.dateso = [dateso1.value, dateso2.value];
   fullscreenLoading.value = true;
   axios
     .post("/erptools", {
@@ -92,7 +102,9 @@ const onSubmit = () => {
     })
     .then((response) => {
       tableData1.length = 0;
-      tableData1.push(...response.data.sodatas);
+      if (response.data.sodatas != null) {
+        tableData1.push(...response.data.sodatas);
+      }
       tableData2.length = 0;
       tableData3.length = 0;
       tableData4.length = 0;
@@ -108,7 +120,11 @@ const onSubmit = () => {
 };
 
 // 根据单元格值设置行颜色
-
+const setRowStyle = ({ row, rowIndex }) => {
+  if (row.status == "未完成") {
+    return { "background-color": "yellow" };
+  }
+};
 // 受订单列表点击某行
 const onSoRowClick = (row: any, column: any, event: any) => {
   if (row["mono"] != "") {
@@ -173,27 +189,35 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
   ></div>
   <el-form :model="form">
     <!-- <el-form-item label="订单预交日"> -->
-    <el-form-item>
-      <el-date-picker
-        v-model="form.dateso"
-        type="daterange"
-        start-placeholder="订单预交日起始日期"
-        end-placeholder="订单预交日截止日期"
-      ></el-date-picker>
-    </el-form-item>
-    <!-- <el-form-item label="货品代号"> -->
-    <el-form-item>
-      <el-select-v2
-        v-model="form.prdno"
-        :options="options"
-        clearable
-        filterable
-        placeholder="货品代号"
-      ></el-select-v2>
-    </el-form-item>
-    <el-form-item>
-      <el-button type="primary" @click="onSubmit">查询</el-button>
-    </el-form-item>
+    <el-space wrap>
+      <el-form-item>
+        <el-date-picker
+          v-model="dateso1"
+          type="date"
+          placeholder="订单预交日起始日期"
+        ></el-date-picker>
+      </el-form-item>
+      <el-form-item>
+        <el-date-picker
+          v-model="dateso2"
+          type="date"
+          placeholder="订单预交日截止日期"
+        ></el-date-picker>
+      </el-form-item>
+      <!-- <el-form-item label="货品代号"> -->
+      <el-form-item>
+        <el-select-v2
+          v-model="form.prdno"
+          :options="options"
+          clearable
+          filterable
+          placeholder="货品代号"
+        ></el-select-v2>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="onSubmit">查询</el-button>
+      </el-form-item>
+    </el-space>
   </el-form>
   <el-affix>
     <el-tabs v-model="activeTab">
@@ -204,6 +228,7 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
           height="700"
           style="width: 100%"
           highlight-current-row
+          :row-style="setRowStyle"
           @row-click="onSoRowClick"
         >
           <el-table-column prop="sono" label="受订单号" width="80" />
@@ -258,13 +283,12 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
       </el-tab-pane>
     </el-tabs>
   </el-affix>
-
   <el-backtop></el-backtop>
 </template>
 
 <style scoped>
 .el-select-v2 {
-  width: 240px;
+  width: 220px;
   text-align: left;
 }
 </style>

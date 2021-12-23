@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import axios from "axios";
+
+const innerHeight = ref(window.innerHeight);
+const outerHeight = ref(window.outerHeight);
+const tableMaxHeight = ref(innerHeight.value - 50 * 3 - 40 - 34);
+
 // 定义常量对象，使用时需要用 xx.value
 // 全屏loading
 const fullscreenLoading = ref(true);
@@ -116,14 +121,23 @@ const onSubmit = () => {
     })
     .finally(() => {
       fullscreenLoading.value = false;
+      total1.value = tableData1.length;
     });
 };
 
 // 根据单元格值设置行颜色
+// 设置stripe后，在改变行颜色，偶数行无法改变
 const setRowStyle = ({ row, rowIndex }) => {
-  if (row.status == "未完成") {
-    return { "background-color": "yellow" };
+  let stylejson = {};
+  if (rowIndex % 2 === 0) {
+    stylejson = { "background-color": "#fafafa" };
+  } else {
+    stylejson = { "background-color": "#ffffff" };
   }
+  if (row.status === "未完成") {
+    stylejson = { "background-color": "yellow" };
+  }
+  return stylejson;
 };
 // 受订单列表点击某行
 const onSoRowClick = (row: any, column: any, event: any) => {
@@ -138,7 +152,9 @@ const onSoRowClick = (row: any, column: any, event: any) => {
       })
       .then((response) => {
         tableData2.length = 0;
-        tableData2.push(...response.data.tzdatas);
+        if (response.data.tzdatas != null) {
+          tableData2.push(...response.data.tzdatas);
+        }
         prdnocp.value = row["prdno"];
         qtycp.value = response.data.qtycp;
         tableData3.length = 0;
@@ -153,6 +169,8 @@ const onSoRowClick = (row: any, column: any, event: any) => {
       })
       .finally(() => {
         fullscreenLoading.value = false;
+        total2.value = tableData2.length;
+        total3.value = tableData3.length;
       });
   }
 };
@@ -168,7 +186,9 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
     })
     .then((response) => {
       tableData4.length = 0;
-      tableData4.push(...response.data.bcpdatas);
+      if (response.data.bcpdatas != null) {
+        tableData4.push(...response.data.bcpdatas);
+      }
       // 切换tab
       activeTab.value = "tab4";
     })
@@ -177,93 +197,205 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
     })
     .finally(() => {
       fullscreenLoading.value = false;
+      total4.value = tableData4.length;
     });
 };
+// table1分页
+const currentPage1 = ref(1);
+const pageSize1 = ref((tableMaxHeight.value - 48) / 48);
+const total1 = ref(0);
+const handleSizeChange1 = (val: any) => {};
+const handleCurrentChange1 = (val: any) => {};
+// table2分页
+const currentPage2 = ref(1);
+const pageSize2 = ref((tableMaxHeight.value - 48) / 71);
+const total2 = ref(0);
+// table3分页
+const currentPage3 = ref(1);
+const pageSize3 = ref((tableMaxHeight.value - 48) / 71);
+const total3 = ref(0);
+// table4分页
+const currentPage4 = ref(1);
+const pageSize4 = ref((tableMaxHeight.value - 48) / 71);
+const total4 = ref(0);
 </script>
 
 <template>
+  <el-backtop></el-backtop>
   <div
     v-loading.fullscreen.lock="fullscreenLoading"
     element-loading-text="Loading..."
     element-loading-background="rgba(0, 0, 0, 0.8)"
   ></div>
-  <el-form :model="form">
-    <!-- <el-form-item label="订单预交日"> -->
-    <el-space wrap>
-      <el-form-item>
-        <el-date-picker
-          v-model="dateso1"
-          type="date"
-          placeholder="订单预交日起始日期"
-        ></el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-date-picker
-          v-model="dateso2"
-          type="date"
-          placeholder="订单预交日截止日期"
-        ></el-date-picker>
-      </el-form-item>
-      <!-- <el-form-item label="货品代号"> -->
-      <el-form-item>
-        <el-select-v2
-          v-model="form.prdno"
-          :options="options"
-          clearable
-          filterable
-          placeholder="货品代号"
-        ></el-select-v2>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="onSubmit">查询</el-button>
-      </el-form-item>
-    </el-space>
-  </el-form>
+  <el-row justify="center">
+    <el-form :model="form">
+      <!-- <el-form-item label="订单预交日"> -->
+      <el-space wrap>
+        <el-form-item>
+          <el-date-picker
+            v-model="dateso1"
+            type="date"
+            placeholder="订单预交日起始日期"
+          ></el-date-picker>
+        </el-form-item>
+        <el-form-item>
+          <el-date-picker
+            v-model="dateso2"
+            type="date"
+            placeholder="订单预交日截止日期"
+          ></el-date-picker>
+        </el-form-item>
+        <!-- <el-form-item label="货品代号"> -->
+        <el-form-item>
+          <el-select-v2
+            v-model="form.prdno"
+            :options="options"
+            clearable
+            filterable
+            placeholder="货品代号"
+          ></el-select-v2>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="onSubmit">查询</el-button>
+        </el-form-item>
+      </el-space>
+    </el-form>
+  </el-row>
   <el-affix>
-    <el-tabs v-model="activeTab">
+    <el-tabs v-model="activeTab" stretch>
       <el-tab-pane label="受订单" name="tab1">
-        <el-table
-          :data="tableData1"
-          stripe
-          height="700"
-          style="width: 100%"
-          highlight-current-row
-          :row-style="setRowStyle"
-          @row-click="onSoRowClick"
-        >
-          <el-table-column prop="sono" label="受订单号" width="80" />
-          <el-table-column prop="prdno" label="货品代号" width="80" />
-          <el-table-column prop="qtyso" label="受订数量" width="80" />
-          <el-table-column prop="estdd" label="预交日期" width="80" />
-          <el-table-column prop="mono" label="制令单号" width="80" />
-          <el-table-column prop="status" label="是否完成" width="80" />
-          <el-table-column prop="cusname" label="客户名称" width="150" />
-          <el-table-column prop="prdname" label="货品名称" width="80" />
-          <el-table-column prop="biltype" label="订单类型" width="80" />
-        </el-table>
-      </el-tab-pane>
-      <el-tab-pane label="制令单" name="tab2">
-        <el-table :data="tableData2" stripe height="800" style="width: 100%">
-          <el-table-column prop="zcname" label="制程名称" width="80" />
-          <el-table-column prop="qty" label="数量" width="80" />
-          <el-table-column prop="qtyfin" label="已完数量" width="80" />
-          <el-table-column prop="qtylost" label="不合格数" width="80" />
-          <el-table-column prop="qtybf" label="报废数量" width="80" />
-          <el-table-column prop="qtysy" label="剩余数量" width="80" />
-          <el-table-column prop="qtypgs" label="已派工量" width="80" />
-          <el-table-column prop="mydinge" label="当前定额" width="80" />
-          <el-table-column prop="tzno" label="通知单号" width="80" />
-          <el-table-column prop="depname" label="部门名称" width="80" />
-        </el-table>
-      </el-tab-pane>
-      <el-tab-pane label="库存" name="tab3">
-        <div>成品库存: {{ prdnocp }}: {{ qtycp }}</div>
         <div>
           <el-table
-            :data="tableData3"
+            :data="
+              tableData1.slice((currentPage1 - 1) * pageSize1, currentPage1 * pageSize1)
+            "
+            :height="tableMaxHeight"
+            :max-height="tableMaxHeight"
+            highlight-current-row
+            :row-style="setRowStyle"
+            @row-click="onSoRowClick"
+          >
+            <el-table-column
+              prop="sono"
+              label="受订单号"
+              width="150"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="prdno"
+              label="货品代号"
+              width="150"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtyso"
+              label="受订数量"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="estdd"
+              label="预交日期"
+              width="100"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="mono"
+              label="制令单号"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="status"
+              label="是否完成"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="cusname"
+              label="客户名称"
+              width="150"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="prdname"
+              label="货品名称"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="biltype"
+              label="订单类型"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+          </el-table>
+        </div>
+        <el-row justify="start">
+          <div>
+            <el-pagination
+              v-model:currentPage="currentPage1"
+              :page-size="pageSize1"
+              :pager-count="5"
+              :hide-on-single-page="true"
+              layout="prev, pager, next"
+              :total="total1"
+              @size-change="handleSizeChange1"
+              @current-change="handleCurrentChange1"
+            >
+            </el-pagination>
+          </div>
+        </el-row>
+      </el-tab-pane>
+      <el-tab-pane label="制令单" name="tab2">
+        <div>
+          <el-table
+            :data="
+              tableData2.slice((currentPage2 - 1) * pageSize2, currentPage2 * pageSize2)
+            "
             stripe
-            height="700"
-            style="width: 100%"
+            highlight-current-row
+            :height="tableMaxHeight"
+            :max-height="tableMaxHeight"
+          >
+            <el-table-column prop="zcname" label="制程名称" width="100" />
+            <el-table-column prop="qty" label="数量" width="80" />
+            <el-table-column prop="qtyfin" label="已完数量" width="80" />
+            <el-table-column prop="qtylost" label="不合格数" width="80" />
+            <el-table-column prop="qtybf" label="报废数量" width="80" />
+            <el-table-column prop="qtysy" label="剩余数量" width="80" />
+            <el-table-column prop="qtypgs" label="已派工量" width="80" />
+            <el-table-column prop="mydinge" label="当前定额" width="80" />
+            <el-table-column prop="tzno" label="通知单号" width="80" />
+            <el-table-column prop="depname" label="部门名称" width="80" />
+          </el-table>
+        </div>
+        <el-row justify="start">
+          <div>
+            <el-pagination
+              v-model:currentPage="currentPage2"
+              :page-size="pageSize2"
+              :pager-count="5"
+              :hide-on-single-page="true"
+              layout="prev, pager, next"
+              :total="total2"
+            >
+            </el-pagination>
+          </div>
+        </el-row>
+      </el-tab-pane>
+      <el-tab-pane label="库存" name="tab3">
+        <el-row justify="start">
+          <div>成品库存: {{ prdnocp }}: {{ qtycp }}</div>
+        </el-row>
+        <div>
+          <el-table
+            :data="
+              tableData3.slice((currentPage3 - 1) * pageSize3, currentPage3 * pageSize3)
+            "
+            stripe
+            :height="tableMaxHeight - 21"
+            :max-height="tableMaxHeight - 21"
             highlight-current-row
             @row-click="onBcpRowClick"
           >
@@ -272,23 +404,64 @@ const onBcpRowClick = (row: any, column: any, event: any) => {
             <el-table-column prop="qty" label="数量" width="80" />
           </el-table>
         </div>
+        <el-row justify="start">
+          <div>
+            <el-pagination
+              v-model:currentPage="currentPage3"
+              :page-size="pageSize3"
+              :pager-count="5"
+              :hide-on-single-page="true"
+              layout="prev, pager, next"
+              :total="total3"
+            >
+            </el-pagination>
+          </div>
+        </el-row>
       </el-tab-pane>
       <el-tab-pane label="半成品区位" name="tab4">
-        <el-table :data="tableData4" stripe height="700" style="width: 100%">
-          <el-table-column prop="prdno" label="货品代号" width="80" />
-          <el-table-column prop="zcname" label="制程名称" width="80" />
-          <el-table-column prop="batno" label="批次号" width="80" />
-          <el-table-column prop="qty" label="数量" width="80" />
-        </el-table>
+        <div>
+          <el-table
+            :data="
+              tableData4.slice((currentPage4 - 1) * pageSize4, currentPage4 * pageSize4)
+            "
+            stripe
+            :height="tableMaxHeight"
+            :max-height="tableMaxHeight"
+            highlight-current-row
+          >
+            <el-table-column prop="prdno" label="货品代号" width="80" />
+            <el-table-column prop="zcname" label="制程名称" width="80" />
+            <el-table-column prop="batno" label="批次号" width="80" />
+            <el-table-column prop="qty" label="数量" width="80" />
+          </el-table>
+        </div>
+        <el-row justify="start">
+          <div>
+            <el-pagination
+              v-model:currentPage="currentPage4"
+              :page-size="pageSize4"
+              :pager-count="5"
+              :hide-on-single-page="true"
+              layout="prev, pager, next"
+              :total="total4"
+            >
+            </el-pagination>
+          </div>
+        </el-row>
       </el-tab-pane>
     </el-tabs>
   </el-affix>
-  <el-backtop></el-backtop>
 </template>
 
 <style scoped>
+.el-form-item {
+  margin-bottom: 0px;
+}
 .el-select-v2 {
   width: 220px;
   text-align: left;
+}
+.el-table {
+  width: 100%;
 }
 </style>

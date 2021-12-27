@@ -121,6 +121,7 @@ const onSubmit = () => {
     })
     .finally(() => {
       fullscreenLoading.value = false;
+      activeTab.value = "tab1";
       total1.value = tableData1.length;
     });
 };
@@ -208,7 +209,7 @@ const handleSizeChange1 = (val: any) => {};
 const handleCurrentChange1 = (val: any) => {};
 // table2分页
 const currentPage2 = ref(1);
-const pageSize2 = ref((tableMaxHeight.value - 48) / 71);
+const pageSize2 = ref((tableMaxHeight.value - 48) / 48);
 const total2 = ref(0);
 // table3分页
 const currentPage3 = ref(1);
@@ -221,12 +222,16 @@ const total4 = ref(0);
 </script>
 
 <template>
-  <el-backtop></el-backtop>
   <div
     v-loading.fullscreen.lock="fullscreenLoading"
     element-loading-text="Loading..."
     element-loading-background="rgba(0, 0, 0, 0.8)"
   ></div>
+  <el-container>
+    <el-header></el-header>
+    <el-main></el-main>
+  </el-container>
+
   <el-row justify="center">
     <el-form :model="form">
       <!-- <el-form-item label="订单预交日"> -->
@@ -278,13 +283,13 @@ const total4 = ref(0);
             <el-table-column
               prop="sono"
               label="受订单号"
-              width="150"
+              width="120"
               :show-overflow-tooltip="true"
             />
             <el-table-column
               prop="prdno"
               label="货品代号"
-              width="150"
+              width="130"
               :show-overflow-tooltip="true"
             />
             <el-table-column
@@ -358,16 +363,66 @@ const total4 = ref(0);
             :height="tableMaxHeight"
             :max-height="tableMaxHeight"
           >
-            <el-table-column prop="zcname" label="制程名称" width="100" />
-            <el-table-column prop="qty" label="数量" width="80" />
-            <el-table-column prop="qtyfin" label="已完数量" width="80" />
-            <el-table-column prop="qtylost" label="不合格数" width="80" />
-            <el-table-column prop="qtybf" label="报废数量" width="80" />
-            <el-table-column prop="qtysy" label="剩余数量" width="80" />
-            <el-table-column prop="qtypgs" label="已派工量" width="80" />
-            <el-table-column prop="mydinge" label="当前定额" width="80" />
-            <el-table-column prop="tzno" label="通知单号" width="80" />
-            <el-table-column prop="depname" label="部门名称" width="80" />
+            <el-table-column
+              prop="zcname"
+              label="制程名称"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qty"
+              label="数量"
+              width="70"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtyfin"
+              label="已完数量"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtysy"
+              label="剩余数量"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtypgs"
+              label="已派工量"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="mydinge"
+              label="当前定额"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtylost"
+              label="不合格数"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="qtybf"
+              label="报废数量"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="tzno"
+              label="通知单号"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
+            <el-table-column
+              prop="depname"
+              label="部门名称"
+              width="80"
+              :show-overflow-tooltip="true"
+            />
           </el-table>
         </div>
         <el-row justify="start">

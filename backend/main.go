@@ -41,6 +41,12 @@ type JsFormSo struct {
 	Dateso []string `json:"dateso"`
 }
 
+type JsFormPg struct {
+	Prdno  string   `json:"prdno"`
+	Zcno   string   `json:"zcno"`
+	Datepg []string `json:"datepg"`
+}
+
 type JsSoData struct {
 	Sono     string  `json:"sono"`
 	EstItmSo int     `json:"estitmso"`
@@ -80,6 +86,28 @@ type JsBcpData struct {
 	Zcname string  `json:"zcname"`
 	Batno  string  `json:"batno"`
 	Qty    float32 `json:"qty"`
+}
+
+type JsPgtjData struct {
+	Prdno     string  `json:"prdno"`
+	Zcno      string  `json:"zcno"`
+	Zcname    string  `json:"zcname"`
+	Qtypg     float32 `json:"qtypg"`
+	Qtywr     float32 `json:"qtywr"`
+	Qtywrlost float32 `json:"qtywrlost"`
+}
+
+type JsPgmxData struct {
+	Pgdd      string  `json:"pgdd"`
+	Pgno      string  `json:"pgno"`
+	Prdno     string  `json:"prdno"`
+	Zcname    string  `json:"zcname"`
+	Sbno      string  `json:"sbno"`
+	Tzno      string  `json:"tzno"`
+	Batno     string  `json:"batno"`
+	Qtypg     float32 `json:"qtypg"`
+	Qtywr     float32 `json:"qtywr"`
+	Qtywrlost float32 `json:"qtywrlost"`
 }
 
 var (
@@ -195,6 +223,22 @@ func PostErpTools(c *gin.Context) {
 			"bcpdatas": BcpDatas,
 			"message":  "获取半成品明细数据",
 			"error":    0,
+		})
+	case "getpgtjlist":
+		// 获取派工统计表
+		PgtjDatas := GetPgtjTableFromDB(jsonMap["args"])
+		c.JSON(http.StatusOK, gin.H{
+			"pgtjdatas": PgtjDatas,
+			"message":   "获取派工统计数据",
+			"error":     0,
+		})
+	case "getpgmxlist":
+		// 获取派工明细表
+		PgmxDatas := GetPgmxTableFromDB(jsonMap["args"])
+		c.JSON(http.StatusOK, gin.H{
+			"pgmxdatas": PgmxDatas,
+			"message":   "获取派工明细数据",
+			"error":     0,
 		})
 	default:
 		c.JSON(http.StatusFound, gin.H{
@@ -362,6 +406,67 @@ func GetBcpTableFromDB(prdno string) []JsBcpData {
 		bcpdatas = append(bcpdatas, JsBcpData{prdno, zcname, batno, qty})
 	}
 	return bcpdatas
+}
+
+func GetPgtjTableFromDB(JsFormPgtjString string) []JsPgtjData {
+	var pgtjdatas []JsPgtjData
+	// 解析json
+	formpg := JsFormPg{}
+	_ = json.Unmarshal([]byte(JsFormPgtjString), &formpg)
+	// utc时间转本地时间
+	t1, _ := time.Parse(time.RFC3339, formpg.Datepg[0])
+	date0 := t1.In(time.Local).Format("2006-01-02")
+	t1, _ = time.Parse(time.RFC3339, formpg.Datepg[1])
+	date1 := t1.In(time.Local).Format("2006-01-02") + " 23:59:59"
+	// 获取数据
+	var rows *sql.Rows
+	if formpg.Prdno == "" {
+		s := `SELECT T1.PRD_NO, T1.ZC_NO, ZC_NO.NAME AS [ZC_NAME], T1.QTY_PG, T1.QTY_FIN, ISNULL(T2.QTY_LOST, 0) AS [QTY_LOST] FROM ( SELECT TF_SCPG.PRD_NO, MF_SCPG.ZC_NO, SUM (TF_SCPG.QTY) AS [QTY_PG], ISNULL(SUM (TF_SCPG.QTY_FIN), 0) AS [QTY_FIN] FROM MF_SCPG, TF_SCPG WHERE MF_SCPG.PG_NO = TF_SCPG.PG_NO AND MF_SCPG.PG_DD BETWEEN ? AND ? GROUP BY TF_SCPG.PRD_NO, MF_SCPG.ZC_NO ) AS T1 LEFT JOIN ( SELECT TF_WR.PRD_NO, TF_WR.ZC_NO, SUM (TF_WR.QTY_LOST) AS [QTY_LOST] FROM MF_WR, TF_WR WHERE MF_WR.WR_NO = TF_WR.WR_NO AND MF_WR.WR_DD BETWEEN ? AND ? GROUP BY TF_WR.PRD_NO, TF_WR.ZC_NO ) AS T2 ON (T1.PRD_NO = T2.PRD_NO AND T1.ZC_NO = T2.ZC_NO) LEFT JOIN ZC_NO ON T1.ZC_NO = ZC_NO.ZC_NO ORDER BY T1.PRD_NO, T1.ZC_NO`
+		rows, err = Sqlconn.Query(s, date0, date1, date0, date1)
+	} else {
+		s := `SELECT T1.PRD_NO, T1.ZC_NO, ZC_NO.NAME AS [ZC_NAME], T1.QTY_PG, T1.QTY_FIN, ISNULL(T2.QTY_LOST, 0) AS [QTY_LOST] FROM ( SELECT TF_SCPG.PRD_NO, MF_SCPG.ZC_NO, SUM (TF_SCPG.QTY) AS [QTY_PG], ISNULL(SUM (TF_SCPG.QTY_FIN), 0) AS [QTY_FIN] FROM MF_SCPG, TF_SCPG WHERE TF_SCPG.PRD_NO = ? AND MF_SCPG.PG_NO = TF_SCPG.PG_NO AND MF_SCPG.PG_DD BETWEEN ? AND ? GROUP BY TF_SCPG.PRD_NO, MF_SCPG.ZC_NO ) AS T1 LEFT JOIN ( SELECT TF_WR.PRD_NO, TF_WR.ZC_NO, SUM (TF_WR.QTY_LOST) AS [QTY_LOST] FROM MF_WR, TF_WR WHERE TF_WR.PRD_NO = ? AND MF_WR.WR_NO = TF_WR.WR_NO AND MF_WR.WR_DD BETWEEN ? AND ? GROUP BY TF_WR.PRD_NO, TF_WR.ZC_NO ) AS T2 ON (T1.PRD_NO = T2.PRD_NO AND T1.ZC_NO = T2.ZC_NO) LEFT JOIN ZC_NO ON T1.ZC_NO = ZC_NO.ZC_NO ORDER BY T1.PRD_NO, T1.ZC_NO`
+		rows, err = Sqlconn.Query(s, formpg.Prdno, date0, date1, formpg.Prdno, date0, date1)
+	}
+	if err != nil {
+		log.Fatal("GetPgtjTableFromDB rows err: ", err.Error())
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var prdno, zcno, zcname string
+		var qtypg, qtywr, qtywrlost float32
+		rows.Scan(&prdno, &zcno, &zcname, &qtypg, &qtywr, &qtywrlost)
+		zcname, _ = tw2s.Convert(zcname)
+		pgtjdatas = append(pgtjdatas, JsPgtjData{prdno, zcno, zcname, qtypg, qtywr, qtywrlost})
+	}
+	return pgtjdatas
+}
+
+func GetPgmxTableFromDB(JsFormPgtjString string) []JsPgmxData {
+	var pgmxdatas []JsPgmxData
+	// 解析json
+	formpg := JsFormPg{}
+	_ = json.Unmarshal([]byte(JsFormPgtjString), &formpg)
+	// utc时间转本地时间
+	t1, _ := time.Parse(time.RFC3339, formpg.Datepg[0])
+	date0 := t1.In(time.Local).Format("2006-01-02")
+	t1, _ = time.Parse(time.RFC3339, formpg.Datepg[1])
+	date1 := t1.In(time.Local).Format("2006-01-02") + " 23:59:59"
+	// 获取数据
+	var rows *sql.Rows
+	s := `SELECT CONVERT(VARCHAR(10), T1.PG_DD, 23) AS [PG_DD], T1.PG_NO, T1.PRD_NO, T1.ZC_NAME, ISNULL(T1.SEB_NO, '') AS [SEB_NO], T1.TZ_NO, ISNULL(T1.BAT_NO, '') AS [BAT_NO], T1.QTY, T1.QTY_FIN, ISNULL(T2.QTY_LOST, 0) AS QTY_LOST FROM (SELECT MF_SCPG.PG_DD, MF_SCPG.PG_NO, TF_SCPG.ITM, TF_SCPG.PRD_NO, ZC_NO.NAME AS ZC_NAME, MF_SCPG.SEB_NO, TF_SCPG.BIL_NO AS TZ_NO, TF_SCPG.BAT_NO, ISNULL(TF_SCPG.QTY, 0) AS QTY, ISNULL(TF_SCPG.QTY_FIN, 0) AS QTY_FIN FROM MF_SCPG INNER JOIN TF_SCPG ON MF_SCPG.PG_NO = TF_SCPG.PG_NO INNER JOIN ZC_NO ON MF_SCPG.ZC_NO = ZC_NO.ZC_NO WHERE (TF_SCPG.PRD_NO = ?) AND (MF_SCPG.ZC_NO = ?) AND (MF_SCPG.PG_DD BETWEEN ? AND ?)) AS T1 LEFT OUTER JOIN (SELECT TF_WR.PG_NO, TF_WR.PRE_ITM AS PG_ITM, TF_WR.PRD_NO, TF_WR.QTY_LOST FROM MF_WR INNER JOIN TF_WR ON MF_WR.WR_NO = TF_WR.WR_NO WHERE (TF_WR.PRD_NO = ?) AND (TF_WR.ZC_NO = ?) AND (MF_WR.WR_DD BETWEEN ? AND ?)) AS T2 ON T1.PG_NO = T2.PG_NO AND T1.ITM = T2.PG_ITM ORDER BY T1.QTY_FIN, T1.PG_DD DESC, T1.ZC_NAME, T1.TZ_NO`
+	rows, err = Sqlconn.Query(s, formpg.Prdno, formpg.Zcno, date0, date1, formpg.Prdno, formpg.Zcno, date0, date1)
+	if err != nil {
+		log.Fatal("GetPgmxTableFromDB rows err: ", err.Error())
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var pgdd, pgno, prdno, zcname, sbno, tzno, batno string
+		var qtypg, qtywr, qtywrlost float32
+		rows.Scan(&pgdd, &pgno, &prdno, &zcname, &sbno, &tzno, &batno, &qtypg, &qtywr, &qtywrlost)
+		zcname, _ = tw2s.Convert(zcname)
+		pgmxdatas = append(pgmxdatas, JsPgmxData{pgdd, pgno, prdno, zcname, sbno, tzno, batno, qtypg, qtywr, qtywrlost})
+	}
+	return pgmxdatas
 }
 
 func LoadFile(path string) ([]byte, error) {
